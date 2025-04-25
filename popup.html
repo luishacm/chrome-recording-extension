@@ -6,6 +6,21 @@
         body { width: 300px; padding: 10px; font-family: Arial, sans-serif; }
         button { width: 100%; padding: 10px; margin-top: 10px; }
         
+        .settings-group {
+            margin-bottom: 15px;
+        }
+        
+        .settings-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .settings-group select {
+            width: 100%;
+            padding: 5px;
+        }
+        
         .recordings-list {
             margin-top: 15px;
             border-top: 1px solid #ccc;
@@ -43,6 +58,28 @@
 </head>
 <body>
     <h1>Screen Recorder</h1>
+    
+    <div class="settings-group">
+        <label for="resolution">Resolution:</label>
+        <select id="resolution">
+            <option value="1920x1080" selected>1080p (1920x1080)</option>
+            <option value="1280x720">720p (1280x720)</option>
+            <option value="854x480">480p (854x480)</option>
+            <option value="640x360">360p (640x360)</option>
+        </select>
+    </div>
+    
+    <div class="settings-group">
+        <label for="bitrate">Bitrate:</label>
+        <select id="bitrate">
+            <option value="20000000">Ultra (20 Mbps)</option>
+            <option value="15000000" selected>Very High (15 Mbps)</option>
+            <option value="10000000">High (10 Mbps)</option>
+            <option value="5000000">Medium (5 Mbps)</option>
+            <option value="2500000">Low (2.5 Mbps)</option>
+        </select>
+    </div>
+    
     <button id="startRecording">Start Recording</button>
     <div id="recordingsList" class="recordings-list"></div>
     <script src="popup.js"></script>

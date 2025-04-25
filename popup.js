@@ -29,7 +29,21 @@ function startNewRecording() {
   startButton.textContent = "Starting...";
   startButton.disabled = true;
   
-  chrome.runtime.sendMessage({ action: "startRecording" }, (response) => {
+  // Get selected resolution and bitrate
+  const resolution = document.getElementById("resolution").value;
+  const bitrate = parseInt(document.getElementById("bitrate").value);
+  
+  // Parse resolution into width and height
+  const [width, height] = resolution.split('x').map(Number);
+  
+  chrome.runtime.sendMessage({ 
+    action: "startRecording",
+    settings: {
+      resolution: { width, height },
+      bitrate: bitrate,
+      frameRate: 24 // Fixed at 24 fps
+    }
+  }, (response) => {
     startButton.disabled = false;
     startButton.textContent = "Start Recording";
     

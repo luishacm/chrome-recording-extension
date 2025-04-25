@@ -22,14 +22,79 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === "startRecording") {
-    chrome.tabs.create({ url: chrome.runtime.getURL("recording-screen.html") }, (tab) => {
-      // Store reference to the recording tab
-      activeRecordings[tab.id] = {
-        startTime: new Date(),
-        status: "recording"
-      };
-      console.log(`Started recording in tab ${tab.id}`, activeRecordings);
-      sendResponse({ success: true, tabId: tab.id });
+    // Create URL with recording settings
+    let url = chrome.runtime.getURL("recording-screen.html");
+    
+    // If settings exist, store them
+    if (message.settings) {
+      const settingsKey = `recording_settings_${Date.now()}`;
+      
+      // Store settings in chrome.storage.local
+      chrome.storage.local.set({ [settingsKey]: message.settings }, () => {
+        // After storing, create tab with settings key as parameter
+        url += `?settings=${settingsKey}`;
+        
+        chrome.tabs.create({ url: url }, (tab) => {
+          // Store reference to the recording tab and settings
+          activeRecordings[tab.id] = {
+            startTime: new Date(),
+            status: "recording",
+            settings: message.settings || {},
+            settingsKey: settingsKey
+          };
+          console.log(`Started recording in tab ${tab.id}`, activeRecordings);
+          sendResponse({ success: true, tabId: tab.id });
+        });
+      });
+    } else {
+      // No settings, just create the tab
+      chrome.tabs.create({ url: url }, (tab) => {
+        activeRecordings[tab.id] = {
+          startTime: new Date(),
+          status: "recording"
+        };
+        console.log(`Started recording in tab ${tab.id}`, activeRecordings);
+        sendResponse({ success: true, tabId: tab.id });
+      });
+    }
+    return true;
+  }
+
+  if (message.action === "getRecordingSettings") {
+    const tabId = sender.tab.id;
+    
+    // If we have settings stored for this tab
+    if (tabId && activeRecordings[tabId] && activeRecordings[tabId].settings) {
+      sendResponse({ settings: activeRecordings[tabId].settings });
+      return true;
+    }
+    
+    // If we have a settings key from URL parameter
+    if (message.settingsKey) {
+      chrome.storage.local.get([message.settingsKey], (result) => {
+        if (result && result[message.settingsKey]) {
+          sendResponse({ settings: result[message.settingsKey] });
+        } else {
+          // Default settings if nothing found
+          sendResponse({ 
+            settings: {
+              resolution: { width: 1920, height: 1080 },
+              bitrate: 15000000,
+              frameRate: 24
+            } 
+          });
+        }
+      });
+      return true;
+    }
+    
+    // Default settings if nothing found
+    sendResponse({ 
+      settings: {
+        resolution: { width: 1920, height: 1080 },
+        bitrate: 15000000,
+        frameRate: 24
+      } 
     });
     return true;
   }
@@ -38,6 +103,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const tabId = message.tabId || (sender.tab && sender.tab.id);
     if (tabId && activeRecordings[tabId]) {
       activeRecordings[tabId].status = "completed";
+      
+      // Clean up storage if we have a settings key
+      if (activeRecordings[tabId].settingsKey) {
+        chrome.storage.local.remove(activeRecordings[tabId].settingsKey);
+      }
+      
       console.log(`Recording downloaded in tab ${tabId}`, activeRecordings);
     }
     return true;
@@ -72,6 +143,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (activeRecordings[tabId]) {
     console.log(`Tab ${tabId} closed, removing from active recordings`);
+    
+    // Clean up storage if we have a settings key
+    if (activeRecordings[tabId].settingsKey) {
+      chrome.storage.local.remove(activeRecordings[tabId].settingsKey);
+    }
+    
     delete activeRecordings[tabId];
   }
 });
