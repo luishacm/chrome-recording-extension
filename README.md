@@ -10,7 +10,7 @@ A Chrome extension that allows you to easily record your screen, browser tab, or
 - Customizable recording settings
 - Easy-to-use interface
 - Download recordings as video files
-- Records both video and audio (when permitted)
+- Records only video, no audio
 
 ## Installation
 
@@ -44,7 +44,7 @@ This extension requires the following permissions:
 - `activeTab`: To access the current tab for recording
 - `desktopCapture`: To capture your screen, windows, or tabs
 - `tabs`: To access tab information for recording
-- `tabCapture`: To capture specific tabs' audio and video
+- `tabCapture`: To capture specific tabs' video
 - `storage`: To save user preferences
 - `host_permissions` for `<all_urls>`: To work on all websites
 
@@ -58,6 +58,5 @@ This extension:
 
 ## Troubleshooting
 
-- **Audio not recording**: Make sure you've granted microphone permissions
 - **Black screen**: Try selecting a different capture source
 - **Extension not working on certain sites**: Some websites with strict security policies may prevent recording
