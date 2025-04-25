@@ -8,6 +8,9 @@ let recordingSettings = {
   frameRate: 24
 };
 
+// Track the streams for proper cleanup
+let activeStreams = [];
+
 window.onload = async () => {
   // Get the tab ID
   chrome.tabs.getCurrent((tab) => {
@@ -30,8 +33,29 @@ window.onload = async () => {
   // Listen for stop commands from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "stopRecording") {
-      console.log("Received stop command from popup");
+      console.log("Received stop command from popup", message);
+      
+      // If this is a force stop, handle it more aggressively
+      if (message.forceStop) {
+        console.log("Force stop requested, immediately stopping all media");
+        
+        // Stop all tracks immediately
+        stopAllMediaTracks();
+        
+        // Force cleanup
+        cleanupAndClose();
+        
+        // Respond immediately
+        if (sendResponse) {
+          sendResponse({ success: true, forceStop: true });
+        }
+        
+        return true;
+      }
+      
+      // Normal stop handling
       stopAndDownload();
+      
       // Send acknowledgment back
       if (sendResponse) {
         sendResponse({ success: true });
@@ -106,6 +130,9 @@ function stopAndDownload() {
   isProcessingStop = true;
   updateStatus("Stopping recording...");
   
+  // Stop all tracks to ensure screen sharing is completely stopped
+  stopAllMediaTracks();
+  
   if (mediaRecorder && mediaRecorder.state !== "inactive") {
     mediaRecorder.stop();
     // The ondataavailable and onstop events will handle the rest
@@ -113,6 +140,23 @@ function stopAndDownload() {
     // If already stopped, force download
     downloadRecording();
   }
+}
+
+// New function to stop all media tracks
+function stopAllMediaTracks() {
+  console.log("Stopping all media tracks...");
+  activeStreams.forEach(stream => {
+    if (stream && stream.getTracks) {
+      stream.getTracks().forEach(track => {
+        if (track.readyState === 'live') {
+          console.log(`Stopping track: ${track.kind}`);
+          track.stop();
+        }
+      });
+    }
+  });
+  // Clear the streams array
+  activeStreams = [];
 }
 
 async function startRecording() {
@@ -139,11 +183,17 @@ async function startRecording() {
           }
         }
       });
+    
+    // Store the stream for later cleanup
+    activeStreams.push(desktopStream);
 
     // Use only video tracks
     const videoStream = new MediaStream([
       ...desktopStream.getVideoTracks()
     ]);
+    
+    // Store this stream too
+    activeStreams.push(videoStream);
 
     // Set up video track with specific constraints
     const videoTrack = videoStream.getVideoTracks()[0];
@@ -228,6 +278,9 @@ function downloadRecording() {
   if (recordedChunks.length === 0) {
     console.error("No recorded chunks to download");
     updateStatus("Error: No data to download");
+    
+    // Even with no data, notify background and close the tab
+    cleanupAndClose();
     return;
   }
 
@@ -237,10 +290,6 @@ function downloadRecording() {
     const a = document.createElement("a");
     a.style.display = "none";
     a.href = url;
-    
-    // Add resolution and bitrate to filename
-    const { width, height } = recordingSettings.resolution;
-    const bitrateInMbps = (recordingSettings.bitrate / 1000000).toFixed(1);
     
     // Get codec info for filename
     let codecName = "webm";
@@ -252,6 +301,9 @@ function downloadRecording() {
       }
     }
     
+    // Add resolution and bitrate to filename
+    const { width, height } = recordingSettings.resolution;
+    const bitrateInMbps = (recordingSettings.bitrate / 1000000).toFixed(1);
     a.download = `screen-recording-${width}x${height}-${bitrateInMbps}Mbps-${codecName}-${Date.now()}.webm`;
     
     document.body.appendChild(a);
@@ -260,18 +312,46 @@ function downloadRecording() {
     
     updateStatus("Recording downloaded!");
     
-    // Notify background script that download completed
-    chrome.runtime.sendMessage({ 
-      action: "recordingDownloaded", 
-      tabId: tabId 
-    });
-
-    // Close the tab after initiating the download
-    setTimeout(() => closeCurrentTab(), 2000);
+    // Clear memory
+    recordedChunks = [];
+    
+    // Cleanup and close the tab
+    cleanupAndClose();
   } catch (err) {
     console.error("Download error:", err);
     updateStatus(`Error downloading: ${err.message}`);
+    
+    // Even on error, try to clean up and close
+    cleanupAndClose();
   }
+}
+
+// New function to handle cleanup and tab closing
+function cleanupAndClose() {
+  // Ensure all tracks are properly stopped again
+  stopAllMediaTracks();
+  
+  // Release the media recorder
+  if (mediaRecorder) {
+    try {
+      if (mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+      }
+    } catch (e) {
+      console.error("Error stopping mediaRecorder:", e);
+    }
+    mediaRecorder = null;
+  }
+  
+  // Notify background script that download completed and screensharing ended
+  chrome.runtime.sendMessage({ 
+    action: "recordingDownloaded", 
+    tabId: tabId,
+    streamStopped: true
+  });
+
+  // Close the tab after a short delay
+  setTimeout(() => closeCurrentTab(), 500);
 }
 
 function closeCurrentTab() {

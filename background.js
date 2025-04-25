@@ -102,14 +102,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "recordingDownloaded") {
     const tabId = message.tabId || (sender.tab && sender.tab.id);
     if (tabId && activeRecordings[tabId]) {
+      console.log(`Recording completed in tab ${tabId}, stream stopped: ${message.streamStopped}`, activeRecordings);
+      
+      // Mark as completed
       activeRecordings[tabId].status = "completed";
+      activeRecordings[tabId].streamStopped = message.streamStopped || false;
       
       // Clean up storage if we have a settings key
       if (activeRecordings[tabId].settingsKey) {
         chrome.storage.local.remove(activeRecordings[tabId].settingsKey);
       }
       
-      console.log(`Recording downloaded in tab ${tabId}`, activeRecordings);
+      // Set a timeout to remove this recording from tracking after some time
+      setTimeout(() => {
+        if (activeRecordings[tabId]) {
+          console.log(`Removing completed recording ${tabId} from tracking`);
+          delete activeRecordings[tabId];
+        }
+      }, 5000); // Clean up after 5 seconds
     }
     return true;
   }
@@ -124,10 +134,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const tabId = message.tabId;
     if (tabId && activeRecordings[tabId]) {
       console.log(`Stopping recording in tab ${tabId}`);
-      chrome.tabs.sendMessage(tabId, { action: "stopRecording" }, (response) => {
+      
+      // Send stop command to the tab
+      chrome.tabs.sendMessage(tabId, { 
+        action: "stopRecording",
+        forceStop: true
+      }, (response) => {
         const success = !chrome.runtime.lastError && response && response.success;
         activeRecordings[tabId].status = success ? "stopping" : "error";
         console.log(`Stop response for tab ${tabId}:`, success ? "Success" : chrome.runtime.lastError || "Failed");
+        
+        // If there was an error or no response, force close the tab after a timeout
+        if (!success) {
+          console.log(`No response from tab ${tabId}, forcing close after timeout`);
+          setTimeout(() => {
+            try {
+              chrome.tabs.get(tabId, (tab) => {
+                if (tab && !chrome.runtime.lastError) {
+                  chrome.tabs.remove(tabId);
+                }
+              });
+            } catch (e) {
+              console.error(`Error force-closing tab ${tabId}:`, e);
+            }
+          }, 3000);
+        }
+        
         sendResponse({ success: success });
       });
       return true;
