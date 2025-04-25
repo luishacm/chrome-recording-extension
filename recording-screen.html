@@ -13,7 +13,7 @@
         }
         
         .container {
-            max-width: 500px;
+            max-width: 800px;
             margin: 0 auto;
             padding: 20px;
             background-color: white;
@@ -48,6 +48,25 @@
             border-radius: 4px;
             min-height: 20px;
         }
+        
+        #recording-preview {
+            width: 100%;
+            max-width: 720px;
+            margin: 20px auto;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            display: none;
+        }
+        
+        #recording-info {
+            font-size: 14px;
+            color: #666;
+            margin: 10px 0;
+            padding: 8px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            text-align: left;
+        }
     </style>
 </head>
 
@@ -55,6 +74,8 @@
     <div class="container">
         <h1>Screen Recording</h1>
         <p>Your screen is being recorded. Click the button below to stop and download.</p>
+        <div id="recording-info">Loading recording information...</div>
+        <video id="recording-preview" autoplay muted></video>
         <button id="stopRecording">Stop Recording</button>
         <div id="status">Recording...</div>
     </div>

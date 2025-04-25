@@ -130,6 +130,12 @@ function stopAndDownload() {
   isProcessingStop = true;
   updateStatus("Stopping recording...");
   
+  // Update recording info to show we're stopping
+  const infoElement = document.getElementById('recording-info');
+  if (infoElement) {
+    infoElement.innerHTML = '<strong>Stopping recording and preparing download...</strong>';
+  }
+  
   // Stop all tracks to ensure screen sharing is completely stopped
   stopAllMediaTracks();
   
@@ -195,9 +201,20 @@ async function startRecording() {
     // Store this stream too
     activeStreams.push(videoStream);
 
-    // Set up video track with specific constraints
+    // Set up video preview
+    const videoPreview = document.getElementById('recording-preview');
+    videoPreview.srcObject = videoStream;
+    videoPreview.style.display = 'block';
+    
+    // Get information about what's being recorded
     const videoTrack = videoStream.getVideoTracks()[0];
+    let recordingSource = "Unknown";
+    let recordingDetails = {};
+    
     if (videoTrack) {
+      recordingSource = videoTrack.label || "Screen";
+      recordingDetails = videoTrack.getSettings();
+      
       // Apply constraints to ensure the desired resolution and frame rate
       await videoTrack.applyConstraints({
         width: { ideal: width, exact: width },
@@ -205,6 +222,9 @@ async function startRecording() {
         frameRate: { ideal: frameRate, exact: frameRate }
       });
     }
+    
+    // Update recording information in the UI
+    updateRecordingInfo(recordingSource, recordingDetails);
 
     // Create media recorder with specified bitrate
     const options = {
@@ -250,16 +270,60 @@ async function startRecording() {
     };
 
     mediaRecorder.onstop = () => {
-      console.log("MediaRecorder stopped, downloading recording...");
+      console.log("MediaRecorder stopped, preparing to download");
+      
+      // Update status
+      updateStatus("Recording stopped, preparing download...");
+      
+      // Update preview UI
+      const videoPreview = document.getElementById('recording-preview');
+      if (videoPreview && videoPreview.srcObject) {
+        // Keep the last frame visible but indicate recording stopped
+        const infoElement = document.getElementById('recording-info');
+        if (infoElement) {
+          infoElement.innerHTML += '<br><strong>Recording stopped, preparing download...</strong>';
+        }
+      }
+      
+      // Proceed with download
       downloadRecording();
     };
 
     mediaRecorder.start(1000); // Collect chunks every second
     updateStatus("Recording...");
-  } catch (err) {
-    console.error("Error: ", err);
-    updateStatus(`Error: ${err.message}`);
+  } catch (error) {
+    console.error("Error starting recording:", error);
+    updateStatus(`Recording error: ${error.message}`);
   }
+}
+
+// New function to update recording information in the UI
+function updateRecordingInfo(source, details) {
+  const infoElement = document.getElementById('recording-info');
+  if (!infoElement) return;
+  
+  // Format the recording information
+  let formattedDetails = '';
+  if (details) {
+    const { width, height, frameRate, deviceId } = details;
+    formattedDetails = `
+      <strong>Source:</strong> ${source}<br>
+      <strong>Resolution:</strong> ${width || '-'} × ${height || '-'}<br>
+      <strong>Frame Rate:</strong> ${frameRate || recordingSettings.frameRate} fps<br>
+      <strong>Bitrate:</strong> ${(recordingSettings.bitrate / 1000000).toFixed(1)} Mbps<br>
+    `;
+    
+    // Try to determine what type of content is being recorded
+    if (source.includes('screen')) {
+      formattedDetails += '<strong>Content Type:</strong> Entire Screen<br>';
+    } else if (source.includes('window')) {
+      formattedDetails += '<strong>Content Type:</strong> Window<br>';
+    } else if (source.includes('tab')) {
+      formattedDetails += '<strong>Content Type:</strong> Browser Tab<br>';
+    }
+  }
+  
+  infoElement.innerHTML = formattedDetails || 'Recording in progress...';
 }
 
 function getStreamId() {
@@ -328,30 +392,38 @@ function downloadRecording() {
 
 // New function to handle cleanup and tab closing
 function cleanupAndClose() {
-  // Ensure all tracks are properly stopped again
+  console.log("Cleaning up and preparing to close tab");
+  
+  // Stop all tracks to make sure screen sharing is disabled
   stopAllMediaTracks();
   
-  // Release the media recorder
-  if (mediaRecorder) {
-    try {
-      if (mediaRecorder.state !== "inactive") {
-        mediaRecorder.stop();
-      }
-    } catch (e) {
-      console.error("Error stopping mediaRecorder:", e);
-    }
-    mediaRecorder = null;
+  // Clear video preview
+  const videoPreview = document.getElementById('recording-preview');
+  if (videoPreview && videoPreview.srcObject) {
+    videoPreview.srcObject = null;
+    videoPreview.style.display = 'none';
   }
   
-  // Notify background script that download completed and screensharing ended
-  chrome.runtime.sendMessage({ 
-    action: "recordingDownloaded", 
-    tabId: tabId,
-    streamStopped: true
-  });
-
-  // Close the tab after a short delay
-  setTimeout(() => closeCurrentTab(), 500);
+  // Update recording info
+  const infoElement = document.getElementById('recording-info');
+  if (infoElement) {
+    infoElement.innerHTML = 'Recording stopped';
+  }
+  
+  // Notify the background script that recording has been downloaded
+  if (tabId) {
+    chrome.runtime.sendMessage({
+      action: "recordingDownloaded",
+      tabId: tabId,
+      streamStopped: true
+    }, () => {
+      // Delay tab close to allow the browser to complete the download
+      setTimeout(closeCurrentTab, 3000);
+    });
+  } else {
+    // Delay tab close to allow the browser to complete the download
+    setTimeout(closeCurrentTab, 3000);
+  }
 }
 
 function closeCurrentTab() {
