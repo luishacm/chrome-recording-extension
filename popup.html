@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Screen Recorder</title>
+    <style>
+        body { width: 300px; padding: 10px; font-family: Arial, sans-serif; }
+        button { width: 100%; padding: 10px; margin-top: 10px; }
+        
+        .recordings-list {
+            margin-top: 15px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+        
+        .recording-item {
+            background: #f5f5f5;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+        
+        .recording-item button {
+            background: #ff3b30;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: auto;
+            padding: 5px 10px;
+            margin-top: 5px;
+        }
+        
+        .recording-item button:hover {
+            background: #d9342a;
+        }
+        
+        h2 {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Screen Recorder</h1>
+    <button id="startRecording">Start Recording</button>
+    <div id="recordingsList" class="recordings-list"></div>
+    <script src="popup.js"></script>
+</body>
+</html>
