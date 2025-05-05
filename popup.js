@@ -41,7 +41,7 @@ function startNewRecording() {
     settings: {
       resolution: { width, height },
       bitrate: bitrate,
-      frameRate: 24 // Fixed at 24 fps
+      frameRate: 30
     }
   }, (response) => {
     startButton.disabled = false;

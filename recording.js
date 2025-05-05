@@ -5,7 +5,7 @@ let isProcessingStop = false;
 let recordingSettings = {
   resolution: { width: 1920, height: 1080 },
   bitrate: 15000000,
-  frameRate: 24
+  frameRate: 30
 };
 
 // Track the streams for proper cleanup

@@ -80,7 +80,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             settings: {
               resolution: { width: 1920, height: 1080 },
               bitrate: 15000000,
-              frameRate: 24
+              frameRate: 30
             } 
           });
         }
@@ -93,7 +93,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       settings: {
         resolution: { width: 1920, height: 1080 },
         bitrate: 15000000,
-        frameRate: 24
+        frameRate: 30
       } 
     });
     return true;
